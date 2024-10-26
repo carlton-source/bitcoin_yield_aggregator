@@ -41,3 +41,8 @@
         (get-total-supply () (response uint uint))
     )
 )
+
+;; Authorization Check
+(define-private (is-contract-owner)
+    (is-eq tx-sender contract-owner)
+)
