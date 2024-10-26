@@ -238,3 +238,7 @@
 (define-read-only (get-user-deposit (user principal))
     (map-get? user-deposits { user: user })
 )
+
+(define-read-only (get-total-tvl)
+    (var-get total-tvl)
+)
