@@ -242,3 +242,7 @@
 (define-read-only (get-total-tvl)
     (var-get total-tvl)
 )
+
+(define-read-only (is-whitelisted (token <sip-010-trait>))
+    (default-to false (get approved (map-get? whitelisted-tokens { token: (contract-of token) })))
+)
