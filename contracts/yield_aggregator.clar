@@ -62,3 +62,15 @@
         (ok true)
     )
 )
+
+(define-public (update-protocol-status (protocol-id uint) (active boolean))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (map-set protocols { protocol-id: protocol-id }
+            (merge (unwrap-panic (get-protocol protocol-id))
+                { active: active }
+            )
+        )
+        (ok true)
+    )
+)
