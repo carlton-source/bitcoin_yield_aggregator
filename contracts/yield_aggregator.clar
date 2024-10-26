@@ -277,3 +277,8 @@
 (define-private (get-protocol-list)
     (list u1 u2 u3 u4 u5) ;; Supported protocol IDs
 )
+
+(define-private (get-protocol-allocation (protocol-id uint))
+    (get allocation (default-to { allocation: u0 }
+        (map-get? strategy-allocations { protocol-id: protocol-id })))
+)
