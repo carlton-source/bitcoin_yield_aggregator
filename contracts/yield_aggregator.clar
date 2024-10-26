@@ -272,3 +272,8 @@
         (ok true)
     )
 )
+
+;; Helper Functions
+(define-private (get-protocol-list)
+    (list u1 u2 u3 u4 u5) ;; Supported protocol IDs
+)
