@@ -46,3 +46,19 @@
 (define-private (is-contract-owner)
     (is-eq tx-sender contract-owner)
 )
+
+;; Protocol Management Functions
+(define-public (add-protocol (protocol-id uint) (name (string-ascii 64)) (initial-apy uint))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (map-set protocols { protocol-id: protocol-id }
+            { 
+                name: name,
+                active: PROTOCOL-ACTIVE,
+                apy: initial-apy
+            }
+        )
+        (map-set strategy-allocations { protocol-id: protocol-id } { allocation: u0 })
+        (ok true)
+    )
+)
