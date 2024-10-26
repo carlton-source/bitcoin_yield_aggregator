@@ -256,3 +256,11 @@
         (ok true)
     )
 )
+
+(define-public (set-emergency-shutdown (shutdown boolean))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (var-set emergency-shutdown shutdown)
+        (ok true)
+    )
+)
