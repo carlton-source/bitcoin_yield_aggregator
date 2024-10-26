@@ -87,3 +87,40 @@
         (ok true)
     )
 )
+
+;; Deposit Management
+(define-public (deposit (token-trait <sip-010-trait>) (amount uint))
+    (let
+        (
+            (user-principal tx-sender)
+            (current-deposit (default-to { amount: u0, last-deposit-block: u0 } 
+                (map-get? user-deposits { user: user-principal })))
+        )
+        (asserts! (not emergency-shutdown) ERR-STRATEGY-DISABLED)
+        (asserts! (>= amount min-deposit) ERR-MIN-DEPOSIT-NOT-MET)
+        (asserts! (<= (+ amount (get amount current-deposit)) max-deposit) ERR-MAX-DEPOSIT-REACHED)
+        (asserts! (is-whitelisted token-trait) ERR-PROTOCOL-NOT-WHITELISTED)
+        
+        ;; Transfer tokens to contract
+        (try! (contract-call? token-trait transfer 
+            amount
+            tx-sender
+            (as-contract tx-sender)
+            none))
+        
+        ;; Update user deposits
+        (map-set user-deposits 
+            { user: user-principal }
+            { 
+                amount: (+ amount (get amount current-deposit)),
+                last-deposit-block: block-height
+            })
+        
+        ;; Update TVL
+        (var-set total-tvl (+ (var-get total-tvl) amount))
+        
+        ;; Rebalance protocols if needed
+        (try! (rebalance-protocols))
+        (ok true)
+    )
+)
