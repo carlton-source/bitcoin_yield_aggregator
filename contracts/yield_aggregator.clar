@@ -156,3 +156,16 @@
         (ok true)
     )
 )
+
+
+;; Yield Distribution and Rewards
+(define-private (calculate-rewards (user principal) (blocks uint))
+    (let
+        (
+            (user-deposit (unwrap-panic (get-user-deposit user)))
+            (weighted-apy (get-weighted-apy))
+        )
+        ;; APY calculation based on blocks passed
+        (/ (* (get amount user-deposit) weighted-apy blocks) (* u10000 u144 u365))
+    )
+)
