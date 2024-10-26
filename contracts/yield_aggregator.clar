@@ -264,3 +264,11 @@
         (ok true)
     )
 )
+
+(define-public (whitelist-token (token principal))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (map-set whitelisted-tokens { token: token } { approved: true })
+        (ok true)
+    )
+)
