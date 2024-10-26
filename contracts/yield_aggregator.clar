@@ -20,3 +20,11 @@
 (define-data-var min-deposit uint u100000) ;; Minimum deposit in sats
 (define-data-var max-deposit uint u1000000000) ;; Maximum deposit in sats
 (define-data-var emergency-shutdown boolean false)
+
+
+;; Data Maps
+(define-map user-deposits { user: principal } { amount: uint, last-deposit-block: uint })
+(define-map user-rewards { user: principal } { pending: uint, claimed: uint })
+(define-map protocols { protocol-id: uint } { name: (string-ascii 64), active: boolean, apy: uint })
+(define-map strategy-allocations { protocol-id: uint } { allocation: uint }) ;; allocation in basis points (100 = 1%)
+(define-map whitelisted-tokens { token: principal } { approved: boolean })
