@@ -211,3 +211,7 @@
         (ok true)
     )
 )
+
+(define-private (get-weighted-apy)
+    (fold + (map get-weighted-protocol-apy (get-protocol-list)) u0)
+)
