@@ -234,3 +234,7 @@
 (define-read-only (get-protocol (protocol-id uint))
     (map-get? protocols { protocol-id: protocol-id })
 )
+
+(define-read-only (get-user-deposit (user principal))
+    (map-get? user-deposits { user: user })
+)
