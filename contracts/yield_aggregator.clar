@@ -246,3 +246,13 @@
 (define-read-only (is-whitelisted (token <sip-010-trait>))
     (default-to false (get approved (map-get? whitelisted-tokens { token: (contract-of token) })))
 )
+
+;; Admin Functions
+(define-public (set-platform-fee (new-fee uint))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (asserts! (<= new-fee u1000) ERR-INVALID-AMOUNT)
+        (var-set platform-fee-rate new-fee)
+        (ok true)
+    )
+)
