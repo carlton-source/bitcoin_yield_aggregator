@@ -74,3 +74,16 @@
         (ok true)
     )
 )
+
+
+(define-public (update-protocol-apy (protocol-id uint) (new-apy uint))
+    (begin
+        (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (map-set protocols { protocol-id: protocol-id }
+            (merge (unwrap-panic (get-protocol protocol-id))
+                { apy: new-apy }
+            )
+        )
+        (ok true)
+    )
+)
