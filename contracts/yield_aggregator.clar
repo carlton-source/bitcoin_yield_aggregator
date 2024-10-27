@@ -1,7 +1,6 @@
 ;; Bitcoin Yield Aggregator
 ;; A sophisticated yield optimization platform for BTC-based assets
 
-
 ;; Constants
 (define-constant contract-owner tx-sender)
 (define-constant ERR-NOT-AUTHORIZED (err u1000))
@@ -19,16 +18,28 @@
 (define-data-var platform-fee-rate uint u100) ;; 1% (base 10000)
 (define-data-var min-deposit uint u100000) ;; Minimum deposit in sats
 (define-data-var max-deposit uint u1000000000) ;; Maximum deposit in sats
-(define-data-var emergency-shutdown boolean false)
-
+(define-data-var emergency-shutdown bool false)
 
 ;; Data Maps
-(define-map user-deposits { user: principal } { amount: uint, last-deposit-block: uint })
-(define-map user-rewards { user: principal } { pending: uint, claimed: uint })
-(define-map protocols { protocol-id: uint } { name: (string-ascii 64), active: boolean, apy: uint })
-(define-map strategy-allocations { protocol-id: uint } { allocation: uint }) ;; allocation in basis points (100 = 1%)
-(define-map whitelisted-tokens { token: principal } { approved: boolean })
+(define-map user-deposits 
+    { user: principal } 
+    { amount: uint, last-deposit-block: uint })
 
+(define-map user-rewards 
+    { user: principal } 
+    { pending: uint, claimed: uint })
+
+(define-map protocols 
+    { protocol-id: uint } 
+    { name: (string-ascii 64), active: bool, apy: uint })
+
+(define-map strategy-allocations 
+    { protocol-id: uint } 
+    { allocation: uint }) ;; allocation in basis points (100 = 1%)
+
+(define-map whitelisted-tokens 
+    { token: principal } 
+    { approved: bool })
 
 ;; SIP-010 Token Interface
 (define-trait sip-010-trait
@@ -63,7 +74,7 @@
     )
 )
 
-(define-public (update-protocol-status (protocol-id uint) (active boolean))
+(define-public (update-protocol-status (protocol-id uint) (active bool))
     (begin
         (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
         (map-set protocols { protocol-id: protocol-id }
@@ -74,7 +85,6 @@
         (ok true)
     )
 )
-
 
 (define-public (update-protocol-apy (protocol-id uint) (new-apy uint))
     (begin
@@ -96,9 +106,9 @@
             (current-deposit (default-to { amount: u0, last-deposit-block: u0 } 
                 (map-get? user-deposits { user: user-principal })))
         )
-        (asserts! (not emergency-shutdown) ERR-STRATEGY-DISABLED)
-        (asserts! (>= amount min-deposit) ERR-MIN-DEPOSIT-NOT-MET)
-        (asserts! (<= (+ amount (get amount current-deposit)) max-deposit) ERR-MAX-DEPOSIT-REACHED)
+        (asserts! (not (var-get emergency-shutdown)) ERR-STRATEGY-DISABLED)
+        (asserts! (>= amount (var-get min-deposit)) ERR-MIN-DEPOSIT-NOT-MET)
+        (asserts! (<= (+ amount (get amount current-deposit)) (var-get max-deposit)) ERR-MAX-DEPOSIT-REACHED)
         (asserts! (is-whitelisted token-trait) ERR-PROTOCOL-NOT-WHITELISTED)
         
         ;; Transfer tokens to contract
@@ -156,7 +166,6 @@
         (ok true)
     )
 )
-
 
 ;; Yield Distribution and Rewards
 (define-private (calculate-rewards (user principal) (blocks uint))
@@ -257,7 +266,7 @@
     )
 )
 
-(define-public (set-emergency-shutdown (shutdown boolean))
+(define-public (set-emergency-shutdown (shutdown bool))
     (begin
         (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
         (var-set emergency-shutdown shutdown)
