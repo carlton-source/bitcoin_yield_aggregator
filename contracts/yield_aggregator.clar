@@ -1,7 +1,5 @@
 ;; Bitcoin Yield Aggregator
 ;; A sophisticated yield optimization platform for BTC-based assets
-;; Author: Claude
-;; License: MIT
 
 ;; Constants
 (define-constant contract-owner tx-sender)
@@ -17,6 +15,7 @@
 (define-constant ERR-INVALID-APY (err u1009))
 (define-constant ERR-INVALID-NAME (err u1010))
 (define-constant ERR-INVALID-TOKEN (err u1011))
+(define-constant ERR-TOKEN-NOT-WHITELISTED (err u1012))
 (define-constant PROTOCOL-ACTIVE true)
 (define-constant PROTOCOL-INACTIVE false)
 (define-constant MAX-PROTOCOL-ID u100)
@@ -146,15 +145,21 @@
     )
 )
 
-;; Token Validation
+;; Enhanced Token Validation
 (define-private (validate-token (token-trait <sip-010-trait>))
-    (let ((token-contract (contract-of token-trait)))
-        (asserts! (is-some (map-get? whitelisted-tokens { token: token-contract })) ERR-PROTOCOL-NOT-WHITELISTED)
+    (let 
+        (
+            (token-contract (contract-of token-trait))
+            (token-info (map-get? whitelisted-tokens { token: token-contract }))
+        )
+        (asserts! (is-some token-info) ERR-TOKEN-NOT-WHITELISTED)
+        (asserts! (get approved (unwrap-panic token-info)) ERR-PROTOCOL-NOT-WHITELISTED)
         (ok true)
     )
 )
 
-;; Deposit Management
+
+;; Deposit Management with Enhanced Security
 (define-public (deposit (token-trait <sip-010-trait>) (amount uint))
     (let
         (
@@ -162,17 +167,14 @@
             (current-deposit (default-to { amount: u0, last-deposit-block: u0 } 
                 (map-get? user-deposits { user: user-principal })))
         )
+        ;; Validate token and check deposit constraints
         (try! (validate-token token-trait))
         (asserts! (not (var-get emergency-shutdown)) ERR-STRATEGY-DISABLED)
         (asserts! (>= amount (var-get min-deposit)) ERR-MIN-DEPOSIT-NOT-MET)
         (asserts! (<= (+ amount (get amount current-deposit)) (var-get max-deposit)) ERR-MAX-DEPOSIT-REACHED)
         
-        ;; Transfer tokens to contract
-        (try! (contract-call? token-trait transfer 
-            amount
-            tx-sender
-            (as-contract tx-sender)
-            none))
+        ;; Safely transfer tokens to contract
+        (try! (safe-token-transfer token-trait amount user-principal (as-contract tx-sender)))
         
         ;; Update user deposits
         (map-set user-deposits 
@@ -198,6 +200,7 @@
             (current-deposit (default-to { amount: u0, last-deposit-block: u0 }
                 (map-get? user-deposits { user: user-principal })))
         )
+        ;; Validate token and check withdrawal constraints
         (try! (validate-token token-trait))
         (asserts! (<= amount (get amount current-deposit)) ERR-INSUFFICIENT-BALANCE)
         
@@ -212,15 +215,19 @@
         ;; Update TVL
         (var-set total-tvl (- (var-get total-tvl) amount))
         
-        ;; Transfer tokens back to user
+        ;; Safely transfer tokens back to user
         (as-contract
-            (try! (contract-call? token-trait transfer
-                amount
-                tx-sender
-                user-principal
-                none)))
+            (try! (safe-token-transfer token-trait amount tx-sender user-principal)))
         
         (ok true)
+    )
+)
+
+;; Safe Token Transfer
+(define-private (safe-token-transfer (token-trait <sip-010-trait>) (amount uint) (sender principal) (recipient principal))
+    (begin
+        (try! (validate-token token-trait))
+        (contract-call? token-trait transfer amount sender recipient none)
     )
 )
 
