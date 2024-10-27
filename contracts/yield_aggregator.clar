@@ -1,5 +1,7 @@
 ;; Bitcoin Yield Aggregator
 ;; A sophisticated yield optimization platform for BTC-based assets
+;; Author: Claude
+;; License: MIT
 
 ;; Constants
 (define-constant contract-owner tx-sender)
@@ -10,8 +12,16 @@
 (define-constant ERR-STRATEGY-DISABLED (err u1004))
 (define-constant ERR-MAX-DEPOSIT-REACHED (err u1005))
 (define-constant ERR-MIN-DEPOSIT-NOT-MET (err u1006))
+(define-constant ERR-INVALID-PROTOCOL-ID (err u1007))
+(define-constant ERR-PROTOCOL-EXISTS (err u1008))
+(define-constant ERR-INVALID-APY (err u1009))
+(define-constant ERR-INVALID-NAME (err u1010))
+(define-constant ERR-INVALID-TOKEN (err u1011))
 (define-constant PROTOCOL-ACTIVE true)
 (define-constant PROTOCOL-INACTIVE false)
+(define-constant MAX-PROTOCOL-ID u100)
+(define-constant MAX-APY u10000) ;; 100% APY in basis points
+(define-constant MIN-APY u0)
 
 ;; Data Variables
 (define-data-var total-tvl uint u0)
@@ -58,10 +68,41 @@
     (is-eq tx-sender contract-owner)
 )
 
+;; Validation Functions
+(define-private (is-valid-protocol-id (protocol-id uint))
+    (and 
+        (> protocol-id u0)
+        (<= protocol-id MAX-PROTOCOL-ID)
+    )
+)
+
+(define-private (is-valid-apy (apy uint))
+    (and 
+        (>= apy MIN-APY)
+        (<= apy MAX-APY)
+    )
+)
+
+(define-private (is-valid-name (name (string-ascii 64)))
+    (and 
+        (not (is-eq name ""))
+        (<= (len name) u64)
+    )
+)
+
+(define-private (protocol-exists (protocol-id uint))
+    (is-some (map-get? protocols { protocol-id: protocol-id }))
+)
+
 ;; Protocol Management Functions
 (define-public (add-protocol (protocol-id uint) (name (string-ascii 64)) (initial-apy uint))
     (begin
         (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
+        (asserts! (is-valid-protocol-id protocol-id) ERR-INVALID-PROTOCOL-ID)
+        (asserts! (not (protocol-exists protocol-id)) ERR-PROTOCOL-EXISTS)
+        (asserts! (is-valid-name name) ERR-INVALID-NAME)
+        (asserts! (is-valid-apy initial-apy) ERR-INVALID-APY)
+        
         (map-set protocols { protocol-id: protocol-id }
             { 
                 name: name,
@@ -77,9 +118,12 @@
 (define-public (update-protocol-status (protocol-id uint) (active bool))
     (begin
         (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
-        (map-set protocols { protocol-id: protocol-id }
-            (merge (unwrap-panic (get-protocol protocol-id))
-                { active: active }
+        (asserts! (is-valid-protocol-id protocol-id) ERR-INVALID-PROTOCOL-ID)
+        (asserts! (protocol-exists protocol-id) ERR-INVALID-PROTOCOL-ID)
+        
+        (let ((protocol (unwrap-panic (get-protocol protocol-id))))
+            (map-set protocols { protocol-id: protocol-id }
+                (merge protocol { active: active })
             )
         )
         (ok true)
@@ -89,11 +133,23 @@
 (define-public (update-protocol-apy (protocol-id uint) (new-apy uint))
     (begin
         (asserts! (is-contract-owner) ERR-NOT-AUTHORIZED)
-        (map-set protocols { protocol-id: protocol-id }
-            (merge (unwrap-panic (get-protocol protocol-id))
-                { apy: new-apy }
+        (asserts! (is-valid-protocol-id protocol-id) ERR-INVALID-PROTOCOL-ID)
+        (asserts! (protocol-exists protocol-id) ERR-INVALID-PROTOCOL-ID)
+        (asserts! (is-valid-apy new-apy) ERR-INVALID-APY)
+        
+        (let ((protocol (unwrap-panic (get-protocol protocol-id))))
+            (map-set protocols { protocol-id: protocol-id }
+                (merge protocol { apy: new-apy })
             )
         )
+        (ok true)
+    )
+)
+
+;; Token Validation
+(define-private (validate-token (token-trait <sip-010-trait>))
+    (let ((token-contract (contract-of token-trait)))
+        (asserts! (is-some (map-get? whitelisted-tokens { token: token-contract })) ERR-PROTOCOL-NOT-WHITELISTED)
         (ok true)
     )
 )
@@ -106,10 +162,10 @@
             (current-deposit (default-to { amount: u0, last-deposit-block: u0 } 
                 (map-get? user-deposits { user: user-principal })))
         )
+        (try! (validate-token token-trait))
         (asserts! (not (var-get emergency-shutdown)) ERR-STRATEGY-DISABLED)
         (asserts! (>= amount (var-get min-deposit)) ERR-MIN-DEPOSIT-NOT-MET)
         (asserts! (<= (+ amount (get amount current-deposit)) (var-get max-deposit)) ERR-MAX-DEPOSIT-REACHED)
-        (asserts! (is-whitelisted token-trait) ERR-PROTOCOL-NOT-WHITELISTED)
         
         ;; Transfer tokens to contract
         (try! (contract-call? token-trait transfer 
@@ -142,6 +198,7 @@
             (current-deposit (default-to { amount: u0, last-deposit-block: u0 }
                 (map-get? user-deposits { user: user-principal })))
         )
+        (try! (validate-token token-trait))
         (asserts! (<= amount (get amount current-deposit)) ERR-INSUFFICIENT-BALANCE)
         
         ;; Update user deposits
@@ -186,6 +243,7 @@
             (rewards (calculate-rewards user-principal (- block-height 
                 (get last-deposit-block (unwrap-panic (get-user-deposit user-principal))))))
         )
+        (try! (validate-token token-trait))
         (asserts! (> rewards u0) ERR-INVALID-AMOUNT)
         
         ;; Update rewards map
